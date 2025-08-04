@@ -1,0 +1,72 @@
+project:
+  type: book
+  output-dir: _alison_r21
+
+format:
+  html:
+    theme:
+      light: united
+      dark: vapor
+    code-link: true
+    code-fold: true
+    code-tools: true
+    df-print: paged
+
+
+book:
+  title: "R21 Analysis"
+  reader-mode: true
+
+
+  page-footer:
+    left: |
+      This Analytic Plan was written by Randy.
+    right: |
+      This book was built with <a href="https://quarto.org/">Quarto</a>.
+
+  
+  navbar:
+    # downloads: [pdf]
+    search: true
+
+
+  repo-url: https://github.com/Goodgolden/
+  repo-branch: main
+  repo-actions: [edit, issue]
+  # repo-actions: [edit]
+  
+  sidebar:
+    search: true
+    tools:
+      - icon: github
+        href: https://github.com/Goodgolden/scope_dcc
+        aria-label: GitHub
+      - icon: info-circle
+        href: https://medschool.cuanschutz.edu/health-care-policy-and-research
+      - icon: hospital
+        aria-label: CU Anschutz
+        href: https://coloradosph.cuanschutz.edu/education/departments/biostatistics-informatics
+
+# format:
+#   pdf:
+#     documentclass: scrartcl
+#     papersize: letter
+
+  chapters:
+    - index.qmd
+    - 00_log.qmd
+    - 01_eda.qmd
+    - 02_cleaning.qmd
+    - 03_subset.qmd
+    - 04_prediction.qmd
+
+
+
+# bibliography: references.bib
+
+editor: source
+
+## to render the book 
+## add the following to the terminal: 
+## quarto preview
+

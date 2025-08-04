@@ -1,0 +1,16 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+/.quarto/
+/data/
+.json
+.html
+/_alison_r21/
+/*_output/
+.parquet
+.rdata
+.csv
+.dta
+/*_cache/
+/*_file/

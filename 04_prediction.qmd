@@ -1,0 +1,163 @@
+---
+title: "Predictive model"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+            warnings = FALSE,
+            message = FALSE,
+            comment = "#>",
+            #results = "hide",
+            digits = 4,
+            error = FALSE)
+## clean the R environment
+# graphics.off()
+# rm(list = ls())
+# freshr::freshr()
+## load packages
+library(here, quietly = TRUE)
+library(tidyverse, quietly = TRUE)
+library(gtsummary, quietly = TRUE)
+library(flextable, quietly = TRUE)
+## check the directory for the file
+# here::dr_here()
+here::set_here()
+## the figure or results should be saved 
+# paste0("foldername/Sfilename_workingresult_", 
+#      Sys.Date(), ".filetype")
+```
+
+```{css, echo=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  max-width: 1000px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+
+# Goal for this chapter
+
+- [ ] Prepare a summary for the Tdatas before the meeting
+  - [ ] outcomes mainly in T8, T11, T18
+- [x] Considering predictive models
+  - [x] linear regression change points (calculating the different between two fixed time points)
+  - [x] random forest change points (calculating the different between two fixed time points)
+  - [x] longitudinal random forest (challenge to get conditional random effect for out sample prediction)
+  - [x] A combination of longitudinal random forest and dynamic prediction
+- [ ] run some examples and get familiar with `LongituRF`
+- [x] You are hunky-dory!
+
+
+## Random forest v.s. Linear model
+
+```{r}
+df <- data.frame(
+  Feature = c(
+    "Model type",
+    "Relationship capture",
+    "Assumptions",
+    "Interpretability",
+    "Handling high-dimensional data",
+    "Overfitting risk",
+    "Prediction performance",
+    "Computation"
+  ),
+  `Random Forest` = c(
+    "Nonparametric",
+    "Complex, nonlinear interactions",
+    "Very few",
+    "Lower interpretability",
+    "Works well; Without explicit selection",
+    "Still overfit if not tuned",
+    "Often better for nonlinear, complex patterns, large number of features",
+    "More computationally intensive"
+  ),
+  `Linear Regression` = c(
+    "Parametric",
+    "Linearity or transformed Linearity",
+    "LI2NE",
+    "Inference interpretable",
+    "May overfit; need extra regularization",
+    "Can overfit if model is too complex or unregularized",
+    "For linear or near-linear relationships",
+    "Computationally efficient"
+  )
+)
+
+flextable(df) |>
+  autofit() |>
+  set_header_labels(
+    Feature = "Feature",
+    `Random.Forest` = "Random Forest",
+    `Linear.Regression` = "Linear Regression"
+  ) |>
+  theme_booktabs() |>
+  align(align = "left", part = "all")
+
+# library(knitr)
+# library(kableExtra)
+# 
+# df |> 
+# kable(format = "latex",
+#  booktabs = TRUE, 
+#  caption = "Random Forest vs. Linear Regression") |> 
+#  kable_styling(latex_options = "hold_position")
+
+```
+
+### Challenge: Longitudinal data
+
+Random forests are a statistical learning method widely used in many areas of scientific research essentially for its ability to learn complex relationships between input and output variables and also its capacity to handle high-dimensional data. 
+However, current random forests approaches are not flexible enough to handle longitudinal data. 
+Moreover, the existing methods cannot predict for out-sample target, which requires crucial conditional random effects given a new individual without any prior information.
+
+Can we provide general predictive approach of random forests for high-dimensional longitudinal data, which we estimate this new out-sample target conditional random effects with partial information (at least one observation from the target). 
+To achieve this goal, we need two main components:
+- a flexible stochastic model which allows the covariance structure to vary over time.
+- a estimation method which provides the conditional random effects into consideration to build random forests. 
+
+$$Y_i(t) = f\big(X_i(t)\big) + Z_i(t) b_i + \omega_i(t) + \epsilon_i$$
+
+
+where
+- $Y_i(t)$ is the output at time $t$ for the $i$th individual;
+- $X_i(t)$ are the input predictors (fixed effects) at time $t$ for the $i$th individual; 
+- $Z_i(t)$ are the random effects at time $t$ for the $i$th individual; 
+- $\omega_i(t)$ is the stochastic process at time $t$ for the $i$th individual, which models the serial correlations of the output measurements; 
+- $\epsilon_i$ is the residual error.
+
+The challenge: getting $b_*(t)$ for a new target individual in order to predict for $\hat Y_*(t)|X_*, Z_*, \hat f, t, \hat b_*, \omega_*$
+
+
+### Solution
+
+We can use [Dynamic Prediction](https://www.drizopoulos.com/vignettes/dynamic_predictions) developed by [Dimitris Rizopoulos](https://github.com/drizopoulos) to estimate the conditional random effects for the new target individual. Then we modify the model.frame in the [LongituRF](https://journals.sagepub.com/doi/10.1177/0962280220946080) to include the conditional random effects in the model.
+
+## Data reduction
+
+The reason why Randy does NOT like Principle Component Analysis (PCA) or Latent factorization (LFA)
+
+- PCA maximizes variance explained, not predictive power — the top PCs may not be the best predictors for your outcome.
+- Assume there are latent factors causing correlation, and estimate those traits while accounting for measurement error. (Is it necessary?)
+- If the true relationships are nonlinear: the LFA model misleading and PCA may not compress information efficiently.
+- Standard PCA doesn’t handle categorical variables naturally (although there are adaptations like multiple correspondence analysis).
+- Very hard to interpret in applied settings.
+
+Could we use Random forest as a model selection method to do a data reduction? 
+
+***feature selection or feature importance–based pruning*** or even with a sequential linear regression to improve intelligibility.
+
+- [x] Handles nonlinear relationships and interactions
+- [x] Works well with both categorical and numeric
+- [x] Robust to multi-collinearity, especially with redundant features
+- [x] Not truly reducing the dimension, but it helps you decide which features to keep.
+- [x] A measurement of feature importance with Gini impurity
+- [x] A ranking system for the features 
+  - in Recursive Feature Elimination (RFE)
+  - Sequential Feature Selection (SFS).
+
+
+

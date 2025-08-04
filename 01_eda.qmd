@@ -1,0 +1,244 @@
+---
+title: "Alison's Code"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+            warnings = FALSE,
+            message = FALSE,
+            comment = "#>",
+            #results = "hide",
+            digits = 4,
+            error = FALSE)
+## clean the R environment
+# graphics.off()
+# rm(list = ls())
+# freshr::freshr()
+## load packages
+library(here, quietly = TRUE)
+library(tidyverse, quietly = TRUE)
+library(gtsummary, quietly = TRUE)
+library(flextable, quietly = TRUE)
+## check the directory for the file
+# here::dr_here()
+here::set_here()
+## the figure or results should be saved 
+# paste0("foldername/Sfilename_workingresult_", 
+#      Sys.Date(), ".filetype")
+```
+
+```{css, echo=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  max-width: 1000px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+## Clean Data
+
+```{r}
+# library(duckdb, quietly = TRUE)
+library(tidyverse)
+library(haven)
+library(labelled)
+
+# Load main dataset and ACS data
+main <- read_dta("data/working.dta")
+acs <- read_dta("data/T16_acs.dta")
+
+names(main)
+names(acs)
+# Keep only cohort3 == 1
+main1 <- main %>% 
+  filter(cohort3 == 1) %>%
+  left_join(acs, by = "studyid") %>%
+  mutate(pctnobroadband = 100 - pctbroadband_18)
+```
+
+```{r, class.output="scroll-100"}
+main1
+```
+
+## Descriptive Statistics
+
+```{r}
+main2 <- main1 %>%
+  mutate(across(ep_pov_18:pctnohealthins_18, ~as.numeric(.))) %>%
+  mutate(across(ep_pov_18:pctnohealthins_18, ~na_if(., . < 0))) %>%
+  arrange(studyid, visitdate) %>%
+  group_by(studyid) %>%
+  mutate(visitno = row_number())
+```
+
+```{r, class.output="scroll-100"}
+main2
+```
+
+## Age
+
+```{r}
+main3 <- main2 %>%
+  group_by(studyid) %>%
+  mutate(index_date = min(visitdate)) %>%
+  ungroup() %>%
+  mutate(censor_date = index_date + lubridate::years(2),
+         censor_visit = visitdate > censor_date) %>%
+  # Cohort4: at least 4 visits, not censored
+  group_by(studyid) %>%
+  mutate(tlvisitno = n(),
+         cohort4 = if_else(min(censor_visit == FALSE) & 
+                             tlvisitno >= 4, 1, 0)) %>%
+  filter(cohort4 == 1) %>%
+  mutate(agecat = case_when(
+    age >= 52 & age < 65 ~ 1,
+    age >= 65 & age < 74 ~ 2,
+    age >= 74 ~ 3,
+    TRUE ~ 0
+  ))
+
+main3$agecat <- factor(main3$agecat, 
+                       labels = c("25-56", 
+                                  "56-70", 
+                                  "70-79", 
+                                  "79-125"))
+```
+
+```{r, class.output="scroll-100"}
+main3
+```
+
+## Subset
+
+```{r}
+main4 <- main3 %>%
+  group_by(studyid) %>%
+  mutate(index_date = min(visitdate)) %>%
+  ungroup() %>%
+  mutate(censor_date = index_date + lubridate::years(2),
+         censor_visit = visitdate > censor_date) %>%
+  group_by(studyid) %>%
+  mutate(tlvisitno = n(),
+         cohort4 = if_else(min(censor_visit == FALSE) & 
+                             tlvisitno >= 4, 1, 0)) %>%
+  filter(cohort4 == 1)
+```
+
+```{r, class.output="scroll-100"}
+main4
+```
+
+## Follow-up and Progress
+
+```{r}
+#| message: false
+#| warning: false
+main5 <- main4 %>%
+  group_by(studyid) %>%
+  arrange(visitdate) %>%
+  mutate(visitno = row_number(),
+    fu_m = as.numeric(visitdate - first(visitdate)) / 30.5,
+    int_d = as.numeric(visitdate - lag(visitdate)),
+    ave_int = median(int_d, na.rm = TRUE),
+    fu_end = max(fu_m, na.rm = TRUE)) %>%
+  ungroup() %>%
+  group_by(studyid) %>%
+  arrange(visitdate) %>%
+  mutate(d_proc = num_proc - lag(num_proc),
+         d_proc_cat = case_when(
+           d_proc > 0 ~ "increase",
+           d_proc < 0 ~ "decrease",
+           d_proc == 0 ~ "no change",
+           TRUE ~ NA_character_),
+         ever_increase = max(d_proc > 0, na.rm = TRUE),
+         d_num_meds = num_ded_meds - lag(num_ded_meds),
+         d_num_meds = if_else(d_num_meds == 0 & 
+                                (ded_meds1 - lag(ded_meds1)) 
+                              != 0, 1, d_num_meds),
+         d_med_cat = case_when(
+           d_num_meds > 0 ~ "increase",
+           d_num_meds < 0 ~ "decrease",
+           TRUE ~ "no change"),
+         any_progress = if_else(ever_increase | 
+                                  d_med_cat != "no change",
+                                1, 0)) %>%
+  ungroup()
+
+```
+
+## Merging Time
+
+```{r}
+main6 <- main5 %>%
+  mutate(tp = case_when(
+    fu_m > 0 & fu_m < 6 ~ 1,
+    fu_m >= 6 & fu_m < 12 ~ 2,
+    fu_m >= 12 & fu_m < 18 ~ 3,
+    fu_m >= 18 ~ 4,
+    TRUE ~ 0))
+```
+
+
+```{r, class.output="scroll-100"}
+main5
+```
+
+## Model fitting
+
+```{r}
+library(survey)
+
+# Basic cluster-adjusted logistic regression using survey package
+main6$cluster_id <- main6$studyid
+design <- svydesign(ids = ~cluster_id, data = main6)
+names(main6)
+main6 <- main6 %>%
+  filter(!is.na(any_progress) &
+         !is.na(agecat) &
+         !is.na(female) &
+         !is.na(yr2017) &
+         !is.na(insurcat2_bl) &
+         !is.na(ethnic_cat) &
+         !is.na(race_cat2) &
+         !is.na(lang_cat) &
+         !is.na(change_coverage) &
+         !is.na(relocate))
+
+# Example: Any Progress ~ Age, Female, Race, etc.
+model0 <- svyglm(any_progress ~ factor(agecat) + female + yr2017 +
+                   factor(insurcat2_bl) + factor(ethnic_cat) +
+                   factor(race_cat2) + factor(lang_cat) +
+                   change_coverage + relocate,
+                 design = design,
+                 family = binomial())
+
+
+# Example: Any Progress ~ Age, Female, Race, etc.
+model1 <- svyglm(any_progress ~ factor(agecat) + female + yr2017 +
+                   factor(insurcat2_bl) + factor(ethnic_cat) +
+                   factor(race_cat2) + factor(lang_cat) +
+                   change_coverage + relocate,
+                 design = design,
+                 family = quasibinomial())
+
+summary(model0)
+summary(model1)
+```
+
+What predictive models?
+- A regression model for the binary? disease progression
+- T break up time for the prediction 
+- on change 
+Table 11 cleaning and the work on the indicator of progression
+prescription drug and procedures on the diseases
+aggregate the data to the patient level... 
+
+the medication for the number, or they change 
+
+longitudinal or survival data predictive way 24, 36 months
+2017 - 2024 for the data each quarter time
+
+
+
+

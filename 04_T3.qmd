@@ -1,0 +1,193 @@
+---
+title: "T3"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+            warnings = FALSE,
+            message = FALSE,
+            comment = "#>",
+            #results = "hide",
+            digits = 4,
+            error = FALSE)
+## clean the R environment
+## load packages
+library(here, quietly = TRUE)
+library(arrow, quietly = TRUE)
+library(tidyverse, quietly = TRUE)
+library(gtsummary, quietly = TRUE)
+library(flextable, quietly = TRUE)
+## check the directory for the file
+# here::dr_here()
+here::set_here()
+## the figure or results should be saved 
+# paste0("foldername/Sfilename_workingresult_", 
+#      Sys.Date(), ".filetype")
+```
+
+```{css, echo=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  max-width: 1000px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+## Goal for this chapter
+- [x] T1 2025-08-04 11:39:03
+- [x] T2 2025-08-04 09:57:34
+- [x] T3
+- [x] T4 2025-08-04 09:57:40
+- [ ] T5
+- [x] T6 2025-08-04 09:57:43
+- [ ] T7
+- [ ] T8
+- [x] T9 2025-08-04 09:57:46
+- [ ] T10
+- [ ] T11
+- [x] T12 2025-08-04 09:57:49
+- [x] T13 2025-08-04 09:57:52
+- [ ] T14
+- [x] T15 2025-08-04 09:57:55
+- [x] T16 ts
+- [x] T17 2025-08-04 09:58:01
+- [ ] T18
+- [x] T19 ts
+- [x] You are polished!
+
+```{r}
+source("R/01_parquet.R")
+```
+
+
+## T3 Table
+
+L1104 - L1565
+
+
+```{r}
+base_path <- "~/Documents/OneDrive - The University of Colorado Denver/Liu, Alison's files - Raw/2025-07-09/"
+file_name <- list.files(base_path,
+                        full.names = TRUE,
+                        pattern = "\\.csv$")
+
+## Get file info including size
+file_info <- file.info(file_name)
+# file_info
+## Extract size in megabytes
+file_info$size_mb <- round(file_info$size / (1024^2), 2)
+```
+
+
+```{r}
+# Show file name and size
+data.frame(file = basename(rownames(file_info)),
+           size_MB = file_info$size_mb) %>% 
+  separate(file, 
+           into = c("file", "number",
+                    "content", "date"),
+           sep = "_", extra = "merge") %>%
+  # separate(number,
+  #          into = c("Table", "number"),
+  #          sep = 1) %>%
+  # mutate(number = as.integer(number)) %>%
+  arrange(number)
+
+```
+
+## Small Tables T2,4,6,9,12,13,14,15,17
+
+```{r}
+file.path(file_name[[13]])
+
+## those are the files small size
+## do not need to be subseted
+T3 <- file.path(file_name[[13]]) %>% 
+  read_csv() %>%
+  janitor::clean_names() %>%
+  mutate(studyid = arb_person_id,
+         visitdate = ymd(encounterdate),
+         visityr = year(visitdate)) %>%
+  mutate(source_icd = case_when(provenance == "Billing Diagnosis" ~ 1L,
+                                provenance == "Encounter Diagnosis" ~ 2L,
+                                provenance == "Problem List" ~ 3L,
+                                TRUE ~ NA_integer_)) %>% 
+  arrange(arb_person_id, encounterdate, source_icd, diagnosiscode) %>%
+  group_by(arb_person_id, encounterdate, source_icd) %>%
+  mutate(noicd = row_number(),
+         maxnoicd = max(noicd)) %>%
+  ungroup() %>%
+  filter(source_icd == 1) %>%
+  select(-problemonsetdate, -problemresolutondate, -provenance,
+         -source_icd, -noicd, -maxnoicd, -diagnosiscodetype) %>%
+  mutate(ded_icd = case_when(str_detect(diagnosiscode, "H16\\.221|H16\\.222|H16\\.223") ~ 0,
+                             str_detect(diagnosiscode, "H11\\.141|H11\\.142|H11\\.143") ~ 1,
+                             str_detect(diagnosiscode, "H04\\.121|H04\\.122|H04\\.123") ~ 2,
+                             str_detect(diagnosiscode, "H16\\.211|H16\\.212|H16\\.213") ~ 3,
+                             str_detect(diagnosiscode, "M35\\.01") ~ 4,
+                             str_detect(diagnosiscode, "M35\\.00") ~ 5,
+                             str_detect(diagnosiscode, "H16\\.101|H16\\.102|H16\\.103") ~ 6,
+                             str_detect(diagnosiscode, "H16\\.121|H16\\.122|H16\\.123") ~ 7,
+                             str_detect(diagnosiscode, "H16\\.141|H16\\.142|H16\\.143") ~ 8,
+                             str_detect(diagnosiscode, "H16\\.231|H16\\.232|H16\\.233") ~ 9,
+                             str_detect(diagnosiscode, "H18\\.831|H18\\.832|H18\\.833") ~ 10,
+                             str_detect(diagnosiscode, "H02\\.88") ~ 11,
+                             TRUE ~ NA_real_)) %>%
+  mutate(ot_icd = case_when(str_detect(diagnosiscode, "L51\\.1|L51\\.3") ~ 1,
+                            str_detect(diagnosiscode, "M35\\.0A|M35\\.0B|M35\\.0C") ~ 2,
+                            str_detect(diagnosiscode, "D89\\.811") ~ 3,
+                            str_detect(diagnosiscode, "D89\\.813") ~ 4,
+                            str_detect(diagnosiscode, "L71\\.9|L71\\.8") ~ 5,
+                            str_detect(diagnosiscode, "H10\\.82") ~ 6,
+                            str_detect(diagnosiscode, "^H01") ~ 7,
+                            str_detect(diagnosiscode, "L71\\.0") ~ 8,
+                            str_detect(diagnosiscode, "L71\\.1") ~ 9,
+                            str_detect(diagnosiscode, "M06\\.9") ~ 10,
+                            str_detect(diagnosiscode, "M32\\.9") ~ 11,
+                            str_detect(diagnosiscode, "^E0(8|9|10|11|13)") ~ 12,
+                            str_detect(diagnosiscode, "E50\\.7") ~ 13,
+                            TRUE ~ NA_real_)) %>%
+  mutate(symp_icd = case_when(str_detect(diagnosiscode, "H53\\.141|H53\\.142|H53\\.143") ~ 1,
+                              str_detect(diagnosiscode, "H57\\.11|H57\\.12|H57\\.13") ~ 2,
+                              str_detect(diagnosiscode, "H04\\.201|H04\\.202|H04\\.203") ~ 3,
+                              str_detect(diagnosiscode, "H53\\.8") ~ 4,
+                              TRUE ~ NA_real_)) %>%
+  group_by(studyid, visitdate) %>%
+  mutate(eyelid = ded_icd == 11,
+         lids = sum(eyelid, na.rm = TRUE)) %>%
+  ungroup() %>%
+  filter(!(ded_icd == 11 & lids > 1)) %>%
+  mutate(empty_record = is.na(ded_icd) & is.na(ot_icd) & is.na(symp_icd)) %>%
+  filter(!empty_record) %>%
+  group_by(studyid, visitdate) %>%
+  mutate(seqno = row_number()) %>%
+  ungroup() %>%
+  tidyr::pivot_wider(id_cols = c(studyid, visitdate),
+                     names_from = seqno,
+                     values_from = c(ded_icd, ot_icd, symp_icd),
+                     names_sep = "") %>%
+  mutate(num_ded_icd = rowSums(!is.na(select(., starts_with("ded_icd")))),
+         num_ot_icd = rowSums(!is.na(select(., starts_with("ot_icd")))),
+         num_symp_icd = rowSums(!is.na(select(., starts_with("symp_icd")))))
+
+
+
+
+
+  
+
+
+
+
+
+
+```
+
+
+
+
+
+
+

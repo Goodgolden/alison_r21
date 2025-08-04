@@ -1,0 +1,51 @@
+---
+title: "Aim1 Read Me First"
+editor: source
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+            warnings = FALSE,
+            message = FALSE,
+            comment = "",
+            #results = "hide",
+            digits = 4,
+            error = FALSE)
+## clean the R environment
+graphics.off()
+rm(list = ls())
+freshr::freshr()
+## load packages
+library(here, quietly = TRUE)
+library(tidyverse, quietly = TRUE)
+library(gtsummary, quietly = TRUE)
+library(flextable, quietly = TRUE)
+## check the directory for the file
+# here::dr_here()
+here::set_here()
+## the figure or results should be saved 
+# paste0("foldername/Sfilename_workingresult_", 
+#      Sys.Date(), ".filetype")
+```
+
+```{css, echo=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  max-width: 1000px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+# Preface {.unnumbered}
+
+This is a Quarto book for 2025 Alsion Liu's R21 project.
+
+*A Visual Tool to Help Develop a Statistical Analysis Plan for Randomized Trials in Palliative Care*
+
+Collaboration with a statistician about the design of a statistical analysis plan can be enhanced by illustrating how statisticians conceptualize their task. This conceptualization can be represented by a directed acyclic graph (DAG), which illustrates the statistician’s approach and also provides an actionable tool to assist in the development of the plan.
+
+Collaboration with a statistician can be enhanced by understanding how they conceptualize questions of study design and data analysis. In the language of constructivism: by explicitly encountering their “mental maps” of these topics. One such mental map pertains to the development of a statistical analysis plan (SAP), an outline of which is one of each team’s work products. Here, we use a figure to describe how statisticians typically conceptualize SAPs, and then illustrate how this figure can be used to develop an outline of a generic SAP for a randomized trial of a pain coping intervention in palliative care. It is our hope that making this conceptual framework explicit can help support more productive interactions between palliative care researchers and statisticians.
+
+
+

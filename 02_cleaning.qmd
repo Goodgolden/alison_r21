@@ -1,0 +1,169 @@
+---
+title: "Data cleaning"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warnings = FALSE,
+                      message = FALSE,
+                      comment = "#>",
+                      cache = TRUE,
+                      #results = "hide",
+                      digits = 4,
+                      error = FALSE)
+## clean the R environment
+# graphics.off()
+# rm(list = ls())
+# freshr::freshr()
+## load packages
+library(here, quietly = TRUE)
+library(tidyverse, quietly = TRUE)
+library(gtsummary, quietly = TRUE)
+library(flextable, quietly = TRUE)
+## check the directory for the file
+# here::dr_here()
+here::set_here()
+## the figure or results should be saved 
+# paste0("foldername/Sfilename_workingresult_", 
+#      Sys.Date(), ".filetype")
+```
+
+```{css, echo=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  max-width: 1000px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+
+## Out-of-Memory Data Handling:
+
+### Package `arrow` with `parquet()`
+
+```{r}
+
+file_t18 <- "~/Documents/OneDrive - The University of Colorado Denver/Liu, Alison's files - Raw/2025-07-09/C3175_T18_OphthamologyExams_20250718.csv"
+file_t8 <- "~/Documents/OneDrive - The University of Colorado Denver/Liu, Alison's files - Raw/2025-07-09/C3175_T8_Labs_20250718.csv"
+
+# data_t18_1k <- read_csv_chunked(file = file_location, 
+#                                 chunk_size = 10000)
+# ?read_csv_chunked
+
+library(arrow)
+
+## Read Arrow/Parquet in chunks using 
+## scan_batches or dataset
+data_t18 <- read_csv_arrow(file_t18)
+
+## The dataset is too big for my computer
+# data_t8 <- read_csv_arrow(file_t8)
+
+```
+
+
+### Chunks with `data.table()`
+
+```{r}
+library(data.table)
+
+# Read the first 100,000 rows
+data1_t8_10k <- fread(file = file_t8, nrows = 10000)
+```
+
+
+```{r, class.output="scroll-100"}
+head(data1_t8_10k)
+```
+
+### Chunk with `reasd_csv_chuncked()`
+
+```{r}
+#| eval: false
+#| include: true
+library(readr)
+
+# Define a callback function for processing each chunk
+process_chunk <- function(x, pos) {
+  cat("Processing chunk starting at row:", pos, "\n")
+  # Perform operations on x (a tibble of the chunk)
+}
+
+## the total of Processing chunk starting at row: 24400001 
+read_csv_chunked(file_t8,
+                 callback = SideEffectChunkCallback$new(process_chunk),
+                 # rows per chunk
+                 chunk_size = 100000)
+```
+
+## Convert functions to loop the data
+
+```{r}
+#| eval: false
+#| include: true
+library(readr)
+library(arrow)
+
+csv_to_parquet_chunks <- function(csv_path,
+                                  output_dir = "chunks_parquet",
+                                  chunk_size = 100000,
+                                  combine_all = FALSE,
+                                  combined_file = "combined_output.parquet") {
+  # Create output directory
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir)}
+  # Initialize chunk counter
+  chunk_num <- 1
+  # Define callback function
+  process_chunk <- function(df, pos) {
+    cat("Processing chunk",
+        chunk_num,
+        "starting at row", 
+        pos, "\n")
+    # Optional: Add processing here 
+    # (e.g., df <- df %>% filter(...))
+    # Save each chunk to Parquet
+    chunk_file <- file.path(output_dir, 
+                            paste0("chunk_", 
+                                   chunk_num, 
+                                   ".parquet"))
+    write_parquet(df, chunk_file)
+    chunk_num <<- chunk_num + 1
+  }
+  
+  # Read in chunks using readr
+  read_csv_chunked(file = csv_path,
+    callback = SideEffectChunkCallback$new(process_chunk),
+    chunk_size = chunk_size)
+  
+  # Optional: combine all chunks into a single Parquet file
+  if (combine_all) {
+    cat("Combining all chunks into one Parquet file...\n")
+    files <- list.files(output_dir, pattern = "\\.parquet$",
+                        full.names = TRUE)
+    tables <- lapply(files, read_parquet)
+    combined_table <- do.call(rbind, tables)
+    write_parquet(combined_table, combined_file)
+  }
+}
+
+```
+
+
+```{r}
+#| eval: false
+#| include: true
+csv_to_parquet_chunks(csv_path = file_t8,
+                      output_dir = "t8",
+                      chunk_size = 500000,
+                      combine_all = FALSE,
+                      combined_file = "t8_final_combine.parquet")
+```
+
+
+```{r, class.output="scroll-100"}
+library(arrow)
+t18_500k <- read_parquet("t8_output/chunk_1.parquet")
+```
+

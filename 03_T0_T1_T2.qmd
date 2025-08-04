@@ -1,0 +1,391 @@
+---
+title: "T0, T1, & T2"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+            warnings = FALSE,
+            message = FALSE,
+            comment = "#>",
+            #results = "hide",
+            digits = 4,
+            error = FALSE)
+## clean the R environment
+## load packages
+library(here, quietly = TRUE)
+library(arrow, quietly = TRUE)
+library(tidyverse, quietly = TRUE)
+library(gtsummary, quietly = TRUE)
+library(flextable, quietly = TRUE)
+## check the directory for the file
+# here::dr_here()
+here::set_here()
+## the figure or results should be saved 
+# paste0("foldername/Sfilename_workingresult_", 
+#      Sys.Date(), ".filetype")
+```
+
+```{css, echo=FALSE}
+.scroll-100 {
+  max-height: 300px;
+  max-width: 1000px;
+  overflow-y: auto;
+  background-color: inherit;
+}
+```
+
+## Goal for this chapter
+- [ ] T1
+- [x] T2 2025-08-04 09:57:34
+- [ ] T3
+- [x] T4 2025-08-04 09:57:40
+- [ ] T5
+- [x] T6 2025-08-04 09:57:43
+- [ ] T7
+- [ ] T8
+- [x] T9 2025-08-04 09:57:46
+- [ ] T10
+- [ ] T11
+- [x] T12 2025-08-04 09:57:49
+- [x] T13 2025-08-04 09:57:52
+- [ ] T14
+- [x] T15 2025-08-04 09:57:55
+- [x] T16 ts
+- [x] T17 2025-08-04 09:58:01
+- [ ] T18
+- [x] T19 ts
+- [x] You are polished!
+
+```{r}
+source("R/01_parquet.R")
+```
+
+## Overall
+
+```{r}
+base_path <- "~/Documents/OneDrive - The University of Colorado Denver/Liu, Alison's files - Raw/2025-07-09/"
+file_name <- list.files(base_path,
+                        full.names = TRUE,
+                        pattern = "\\.csv$")
+
+## Get file info including size
+file_info <- file.info(file_name)
+# file_info
+## Extract size in megabytes
+file_info$size_mb <- round(file_info$size / (1024^2), 2)
+```
+
+
+```{r}
+# Show file name and size
+data.frame(file = basename(rownames(file_info)),
+           size_MB = file_info$size_mb) %>% 
+  separate(file, 
+           into = c("file", "number",
+                    "content", "date"),
+           sep = "_", extra = "merge") %>%
+  # separate(number,
+  #          into = c("Table", "number"),
+  #          sep = 1) %>%
+  # mutate(number = as.integer(number)) %>%
+  arrange(number)
+
+```
+
+## Small Tables T2,4,6,9,12,13,14,15,17
+
+```{r}
+## those are the files small size
+## do not need to be subseted
+T2  <- file.path(file_name[[12]]) %>% read_csv()
+# View(T2)
+T4  <- file.path(file_name[[14]]) %>% read_csv()
+# View(T4)
+T6  <- file.path(file_name[[16]]) %>% read_csv()
+# View(T6)
+T9  <- file.path(file_name[[19]]) %>% read_csv()
+# View(T9)
+T12 <- file.path(file_name[[4]]) %>% read_csv()
+# View(T12)
+T13 <- file.path(file_name[[5]]) %>% read_csv()
+# View(T13)
+T14 <- file.path(file_name[[6]]) %>% read_csv()
+# View(T14)
+T15 <- file.path(file_name[[7]]) %>% read_csv()
+# View(T15) ## the size for this dataset is 57.51
+T17 <- file.path(file_name[[9]]) %>% read_csv()
+# View(T17)
+```
+
+
+## Census table T16
+
+```{r}
+file_name[[8]]
+T16 <- file.path(file_name[[8]]) %>% 
+  read_csv() %>%
+  janitor::clean_names() %>%
+  mutate(studyid = arb_person_id) %>%
+  relocate(studyid, 
+           .before = arb_person_id)
+
+## Save to Stata
+save(T16, file = "data/T16_Census.rdata")
+```
+
+## Long form table T19
+
+```{r}
+#| eval: false
+#| include: true
+
+file_name[[11]]
+T19 <- file.path(file_name[[11]]) %>% 
+  read_csv() %>% 
+  janitor::clean_names() %>% 
+  mutate(studyid = arb_person_id,
+         visitdate = ymd(str_sub(encounter_date, 1, 10))) %>%
+  arrange(studyid, visitdate, arb_encounter_id) %>%
+  group_by(studyid, visitdate) %>%
+  mutate(seqno = row_number()) %>%
+  ungroup() %>%
+  filter(seqno == 1) %>%  # Keep first record per day
+  select(-seqno) %>%
+  arrange(studyid, visitdate, arb_encounter_id) %>%
+  group_by(studyid) %>%
+  mutate(visitno = row_number()) %>%
+  ungroup()
+
+T19 <- T19 %>% 
+  mutate(censored = deceased_yn == "Y",
+         right_censored = as.logical(max(censored, na.rm = TRUE))) %>%
+  mutate(dod_str = if_else(censored, as.character(cdphe_dod), NA_character_),
+         dod_str = if_else(censored & is.na(dod_str), as.character(date_of_death_emr), dod_str),
+         dod = suppressWarnings(ymd(dod_str))) %>%
+  group_by(studyid) %>%
+  mutate(right_censored = max(censored, na.rm = TRUE)) %>%
+  ungroup()
+
+T0 <- T19 %>%
+  group_by(studyid) %>%
+  mutate(fu_d = as.numeric(visitdate - first(visitdate)),
+         fu_m = fu_d / 30.5,
+         fu_yr = fu_m / 12) %>%
+  ungroup() %>%
+  mutate(insurcat = case_when(payor_financial_class == "Medicare" ~ 0,
+      payor_financial_class %in% c("Colorado Medicaid", "Out of State Medicaid") ~ 3,
+      payor_financial_class %in% c("Managed Medicaid", "Managed Care", "Managed Medicare", "Commercial") ~ 1,
+      payor_financial_class %in% c("Worker's Comp", "Tricare", "Indigent Care", "Special Accounts") ~ 5,
+      payor_financial_class %in% c("UCHEALTH EMPLOYEE PLAN", "CU - UA NET") ~ 4,
+      payor_financial_class == "Self-Pay" ~ 2,
+      TRUE ~ NA_real_)) %>%
+  group_by(studyid) %>%
+  mutate(visitno = row_number(),
+         d_insur = insurcat - lag(insurcat),
+         change_insur = if_else(!is.na(d_insur), d_insur != 0, FALSE),
+         change_coverage = max(change_insur, na.rm = TRUE),
+         insurcat2 = if_else(insurcat >= 4, 4, insurcat)) %>%
+  ungroup() %>%
+  mutate(zip_code_new = as.integer(factor(zip_code))) %>%
+  group_by(studyid) %>%
+  arrange(visitno, .by_group = TRUE) %>%
+  mutate(d_zip = zip_code_new - lag(zip_code_new),
+         change_zip_code = if_else(!is.na(zip_code) & !is.na(d_zip), d_zip != 0, FALSE),
+         relocate = max(change_zip_code, na.rm = TRUE)) %>%
+  ungroup()
+
+T0_tvT1 <- T0 %>%
+  select(studyid, visitdate, 
+         visitno, dod, censored, 
+         right_censored,
+         insurcat, change_insur, 
+         change_coverage, zip_code,
+         change_zip_code, relocate)
+
+# Save
+write_parquet(T0_tvT1, "data/T0_TempTable_tvT1.parquet")
+write_parquet(T0, "data/T0_TempTable.parquet")
+```
+
+## Table1 T1
+
+Table1 L424 to L764
+
+```{r}
+#| eval: false
+#| include: true
+
+## Ask alison about the encounterdate and the transferindate
+T1 <- file.path(file_name[[1]]) %>% 
+  read_csv() %>% 
+  janitor::clean_names() %>% 
+  mutate(studyid = arb_person_id) %>%
+  relocate(studyid, .before = arb_person_id) %>%
+  # filter(birth_date != "") %>% View()
+  group_by(studyid) %>%
+  mutate(dup_id = n() > 1) %>%
+  ungroup() %>% 
+  mutate(cohort2 = cohort_1_or_2,
+         cohort2 = if_else(is.na(cohort2), 0, cohort2),
+         cohort2 = as.integer(cohort2)) %>%
+  mutate(female = case_when(
+    sex == "Female" ~ 1,
+    sex == "Male" ~ 0,
+    ## 2 is unknown
+    TRUE ~ 2),
+    # recode unknown as male
+    female = if_else(female == 2, 0, female)) %>% 
+  mutate(dob = suppressWarnings(parse_date_time(birth_date, 
+                                                orders = c("mdy", "ymd"))),
+         birth_yr = year(dob)) %>%
+  mutate(race_cat1 = case_when(race == "Black or African American" ~ 2,
+                               race %in% c("Asian Indian", 
+                                           "Chinese", 
+                                           "Filipino",
+                                           "Guamanian or Chamorro",
+                                           "Japanese", 
+                                           "Korean", 
+                                           "Vietnamese", 
+                                           "Other Asian") ~ 3,
+                               race %in% c("American Indian or Alaska Native", 
+                                           "Native Hawaiian", 
+                                           "Native Hawaiian and Other Pacific Islander", 
+                                           "Other Pacific Islander",
+                                           "Samoan") ~ 5,
+                               race %in% c("Patient Declined", 
+                                           "Unknown", "") ~ 4,
+                               race %in% c("More Than One Race",
+                                           "Other") ~ 1,
+                               # Default to White
+                               TRUE ~ 0),
+         race_cat2 = if_else(race_cat1 == 5L, 3L, race_cat1)) %>%
+  mutate(lang_cat = case_when(primary_language == "Spanish" ~ 1L,
+                              primary_language == "English" ~ 0L,
+                              primary_language %in% c("*Unspecified", "Unknown") ~ 3L,
+                              TRUE ~ 2L),
+    lang_help = (need_interpreter == "Y"))
+
+race_labels1 <- c("0" = "White", 
+                  "1" = "1+ race| ot", 
+                  "2" = "Black", 
+                  "3" = "Asian", 
+                  "4" = "Unknown", 
+                  "5" = "Indigent| Islander")
+
+race_labels2 <- c("0" = "White", 
+                  "1" = "1+ race| ot",
+                  "2" = "Black", 
+                  "3" = "Asian| Indigent| Islander", 
+                  "4" = "Unknown")
+
+T1$race_cat1 <- factor(T1$race_cat1, 
+                       levels = 0:5, 
+                       labels = race_labels1)
+T1$race_cat2 <- factor(T1$race_cat2, 
+                       levels = 0:4,
+                       labels = race_labels2)
+
+# Keep key variables
+T1_1 <- T1 %>%
+  select(studyid, cohort2,
+         dob, birth_yr, 
+         female, race_cat2,
+         lang_cat, lang_help) %>%
+  arrange(studyid)
+
+
+write_parquet(T1_1, "data/T1_person_cleaned.parquet")
+write_parquet(T1, "data/T1_person_cleaned_full.parquet")
+# save(T1, file = "data/T1_person_cleaned.rdata")
+```
+
+
+## Merge T0 T1
+
+L766 - L818
+
+
+```{r}
+# View(T1_1)
+# View(T0_tvT1)
+Tmerg0_1 <- T1 %>%
+  ## keep=.TRUE to track _merge-like info
+  left_join(T0, keep = FALSE) %>%   
+  mutate(.merge = case_when(!is.na(studyid) & !is.na(visitdate) ~ 3L, 
+                            # in master only
+                            !is.na(studyid) & is.na(visitdate) ~ 1L,  
+                            # in using only
+                            TRUE ~ 2L)) %>%
+  filter(.merge != 1L) %>%
+  relocate(visitdate, visitno, fu_m,
+           zip_code, change_zip_code, relocate,
+           insurcat, change_insur, change_coverage,
+           censored, right_censored,
+           dod, .after = lang_help) %>% 
+  arrange(studyid, visitdate)
+
+
+write_parquet(Tmerg0_1, "data/Tmerg0_1_working.parquet")
+```
+
+
+## Merge T0 T2
+
+L818 - L1102
+
+```{r}
+#| message: false
+#| warning: false
+T2 <- file.path(file_name[[12]]) %>%
+  read_csv() %>% 
+  janitor::clean_names() %>%
+  mutate(studyid = arb_person_id,
+         visitdate = ymd(str_sub(date, 1, 10))) %>%
+  relocate(visitdate, .after = arb_person_id) %>%
+  filter(!encounter_type %in% c("Anesthesia", 
+                                "Anesthesia Event", 
+                                "Patient Message", 
+                                "Nurse Triage")) %>%
+  filter(!str_detect(tolower(provider_name), "diagnostic"),
+         !str_detect(tolower(provider_name), "resident"),
+         !str_detect(tolower(provider_name), "eye")) %>%
+  arrange(studyid, visitdate, arb_encounter_id) %>%
+  group_by(studyid, visitdate) %>%
+  mutate(dupind = n() - 1) %>%
+  ungroup() %>% 
+  group_by(studyid, visitdate) %>%
+  mutate(seqno = row_number()) %>%
+  ungroup() %>%
+  filter(seqno == 1) %>%
+  select(-seqno) %>%
+  mutate(insurcat = case_when(payor_financial_class == "Medicare" ~ 0L,
+                              payor_financial_class %in% c("Colorado Medicaid", 
+                                                           "Out of State Medicaid") ~ 3L,
+                              payor_financial_class %in% c("Managed Medicaid", 
+                                                           "Managed Care", 
+                                                           "Managed Medicare", 
+                                                           "Commercial") ~ 1L,
+                              payor_financial_class %in% c("Worker's Comp",
+                                                           "Tricare", "Indigent Care", 
+                                                           "Special Accounts") ~ 5L,
+                              payor_financial_class %in% c("UCHEALTH EMPLOYEE PLAN", 
+                                                           "CU - UA NET") ~ 4L,
+                              payor_financial_class == "Self-Pay" ~ 2L,
+                              TRUE ~ NA_integer_),
+         insurcat2 = if_else(insurcat >= 4 & !is.na(insurcat),
+                             4L, insurcat))
+
+write_parquet(T2, "data/T2_encounter_clean.parquet")
+
+Tmerg0_1_2 <- Tmerg0_1 %>% 
+  left_join(T2, keep = FALSE) %>% 
+  mutate(merge_T102 = case_when(
+      !is.na(arb_encounter_id) & !is.na(lang_help) ~ 3L,
+      is.na(arb_encounter_id) & !is.na(lang_help) ~ 1L,
+      TRUE ~ 2L)) %>%
+  filter(merge_T102 != 1L)
+
+write_parquet(Tmerg0_1_2, "data/Tmerg_0_1_2_working.parquet")
+```
+
+

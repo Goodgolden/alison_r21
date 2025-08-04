@@ -1,0 +1,78 @@
+---
+title: "Meeting logs"
+---
+
+## Records
+
+### 20250710
+- a billing code and also the comments on the files
+- The final modeling outcomes symptoms and signs: signs extrat from the label, the test order 
+
+- indicator for the accessing care one of the outcome
+- X patient free text extraction 
+- pulling the extract results as the outcomes
+- the outcomes changes in the prescription related to the procedures CPT codes 
+
+- composite outcomes whether patient has any changes in the prescription new procedures (aggregate the results)
+- potentially for a change point model. 
+
+
+- details for the dataset
+  - the two year observation periods, come into different time point, arbitary index visit. 
+  - first year 2017 a lot of patients with ICD codes with dry eye... we consider as old patients
+  - who did not came but after we consider as new patients
+  - the new / established patients: change in the medication within 2 year. 
+  - those parts of the data separately established and new patients
+  - new procedures for the established patients, the new patients, and the new procedures for the established patients
+
+- demographic information and other variables.
+
+  - 1/3 of the records to link to the community serve merges 
+  - 10 - 15 variables for 40 questionnaires enrichment
+  - correlations and stepwised variables selections. 
+  - clusters the logistic regression (**potential problem with the out-sample target prediction**)
+
+- univariables with the cluster (wider CI) vs. robust variance
+  - more conservative one will be used AIC and BIC 
+  - compare the models with the AIC and BIC
+  - can explore more to model, not a model for the association of the social and predictive model. 
+  - recent report and meta-Ana the dry eye based
+
+- definition in the clinical research paper: 
+  - age and dry eye, 
+  - the dry eye symptoms, 
+  - the dry eye signs, 
+  - the dry eye diagnosis
+
+- **paper TFOS dry eye workshop 3 (https://pubmed.ncbi.nlm.nih.gov/40467022/)**
+
+
+
+### 20250721
+
+The things need to be changes and ask for the data manager
+1. Birthday format the two digits the wrong format
+2. T11 the physician notes the medical chart
+
+1. dryeye_ash_new_AL.do
+  -  Contact lens for the extract the information of whether they mention any things.
+  - Preservatives for the eyedrops extraction from the text
+  - Blink rate (read the codes for the prescription)
+  - Medication correlation and the medication T7 (skip for now)
+  - The consistency over 90% (T18 or T8)
+  - For the corneal staining: Resolved as better or absence 
+  - Tear break up time 
+  - Shirmer test from on the lower eyelid
+  - Meibography for the eyelids on the Meibomian gland
+  -  Tear Osmolarity data Table8 more values from the table than Table11
+
+2. Conjunctival staining
+3. Patient reported symptoms nots 
+4. Using artificial tear is not in Table5 (medication table)
+5. Free text based on the patient and structured questionnaire
+ 
+**Table11 is the one I need to use.**
+
+
+
+

@@ -1,0 +1,42 @@
+---
+title: "T2_T8"
+---
+
+
+
+
+
+```{r}
+t8 <- read_dta("/Users/liualis/.../T8_tear_osmo.dta")
+
+t102 <- t102 %>%
+  left_join(t8, by = c("studyid", "visitdate"), keep = TRUE) %>%
+  mutate(
+    merge_T8 = case_when(
+      !is.na(osmo1) & !is.na(lang_help) ~ 3L,
+      is.na(osmo1) & !is.na(lang_help) ~ 1L,
+      TRUE ~ 2L
+    )
+  ) %>%
+  select(-osmo1, -osmo2, -nomissing)
+
+```
+
+```{r}
+t18 <- read_dta("/Users/liualis/.../T18_small.dta")
+
+t102818 <- t102 %>%
+  left_join(t18, by = c("studyid", "visitdate"), keep = TRUE) %>%
+  mutate(
+    merge_T818 = case_when(
+      !is.na(variable_from_t18) & !is.na(lang_help) ~ 3L,
+      is.na(variable_from_t18) & !is.na(lang_help) ~ 1L,
+      TRUE ~ 2L
+    )
+  )
+
+
+write_dta(t102818, "/Users/liualis/.../working_T102818.dta")
+```
+```
+
